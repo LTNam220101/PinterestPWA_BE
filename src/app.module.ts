@@ -9,6 +9,10 @@ import { PinModule } from './pin/pin.module';
 import { PaginationModule } from './pagination/pagination.module';
 import { TagModule } from './tag/tag.module';
 import { ThumbnailModule } from './thumbnail/thumbnail.module';
+import { SearchModule } from './search/search.module';
+import { AppController } from './app.controller';
+import { UpdatesModule } from './updates/updates.module';
+import { CommentModule } from './comment/comment.module';
 
 @Module({
   imports: [
@@ -19,6 +23,7 @@ import { ThumbnailModule } from './thumbnail/thumbnail.module';
       useFactory: async (config: ConfigService) => {
         return {
           type: 'postgres',
+          ssl: true,
           host: config.get('DB_HOST'),
           port: config.get('DB_PORT'),
           username: config.get('DB_USERNAME'),
@@ -37,8 +42,11 @@ import { ThumbnailModule } from './thumbnail/thumbnail.module';
     TagModule,
     PaginationModule,
     ThumbnailModule,
+    SearchModule,
+    UpdatesModule,
+    CommentModule,
   ],
-  controllers: [],
+  controllers: [AppController],
   providers: [],
 })
 export class AppModule {}

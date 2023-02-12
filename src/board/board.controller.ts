@@ -29,7 +29,6 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards';
 import { BoardService } from './board.service';
-import { AddPinDto } from './dto/add-pin.dto';
 import { BaseBoardDto } from './dto/base-board.dto';
 import { PageDto } from '../pagination/page.dto';
 import { RemovePinDto } from './dto/remove-pin.dto';
@@ -48,6 +47,7 @@ import { updateBoardInput } from './swagger/input/update-board.input';
 import { UpdateBoardOutput } from './swagger/output/update-board.output';
 import { PaginationService } from 'src/pagination/pagination.service';
 import { ApiOkResponsePaginated } from 'src/pagination/pagination.output';
+import { AddPinWithTagDto } from './dto/add-tag.dto';
 
 @ApiTags('board')
 @Controller('board')
@@ -121,7 +121,7 @@ export class BoardController {
   @ApiOperation({
     summary: 'save pin',
     description:
-      'Save a new pin or create a new pin then save it to the board with the provided id',
+      'Save a new pin or create a new pin then save it to the board with the provided id during saving or add tag with a pin',
   })
   @ApiParam({
     name: 'id',
@@ -137,14 +137,20 @@ export class BoardController {
     @Req() req,
     @Param('id', new ParseIntPipe()) id: number,
     @UploadedFile() imageFile: Express.Multer.File,
-    @Body() pinDto: AddPinDto,
+    @Body() pinTagDto: AddPinWithTagDto,
   ) {
-    return await this.boardService.savePinToBoard(
+    const data = await this.boardService.savePinToBoard(
       req.user.id,
-      pinDto,
+      pinTagDto,
       id,
       imageFile,
     );
+    return {
+      ...data,
+      pins: data.pins.map((v) => ({
+        id: v.id,
+      })),
+    };
   }
 
   @ApiOkResponsePaginated(GetAllBoardOutput, true)

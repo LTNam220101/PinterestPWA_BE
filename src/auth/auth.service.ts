@@ -30,6 +30,16 @@ export class AuthService {
     return user;
   }
 
+  async validateUserJwtToken(token: string, mode: 'refresh' | 'access') {
+    const data = await this.cryptoService.verifyJwt(token, mode);
+    if (data.id) {
+      const user = await this.userService.findOneById(data.id);
+      return user;
+    } else {
+      throw new UnauthorizedException();
+    }
+  }
+
   async signInUser(id: number, username: string) {
     const accessToken = await this.cryptoService.generateJwt({
       id,
@@ -45,6 +55,7 @@ export class AuthService {
       throw new InternalServerErrorException(res.raw);
     }
     return {
+      id,
       accessToken,
       refreshToken,
     };
@@ -90,5 +101,12 @@ export class AuthService {
     } else {
       throw new UnauthorizedException('Invalid refresh token');
     }
+  }
+
+  async signOut(userId: number) {
+    return await this.userService.updateUser(userId, {
+      hashRefeshToken: null,
+      deviceToken: null,
+    });
   }
 }

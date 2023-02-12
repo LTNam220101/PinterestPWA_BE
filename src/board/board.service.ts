@@ -10,13 +10,14 @@ import { Pin } from 'src/pin/pin.entity';
 import { User } from 'src/user/user.entity';
 import { Repository } from 'typeorm';
 import { Board, Visibility } from './board.entity';
-import { AddPinDto } from './dto/add-pin.dto';
 import { BaseBoardDto } from './dto/base-board.dto';
 import { PageDto } from '../pagination/page.dto';
 import { RemovePinDto } from './dto/remove-pin.dto';
 import { UpdateBoardDto } from './dto/update-board.dto';
 import { ThumbnailService } from 'src/thumbnail/thumbnail.service';
 import { randomUUID } from 'node:crypto';
+import { AddPinWithTagDto } from './dto/add-tag.dto';
+import { Tag } from 'src/tag/entities/tag.entity';
 
 @Injectable()
 export class BoardService {
@@ -24,6 +25,7 @@ export class BoardService {
     @InjectRepository(Board) private boardRepository: Repository<Board>,
     @InjectRepository(User) private userRepsitory: Repository<User>,
     @InjectRepository(Pin) private pinRepository: Repository<Pin>,
+    @InjectRepository(Tag) private tagRepository: Repository<Tag>,
     private thumbnailService: ThumbnailService,
     private firebaseService: FirebaseService,
   ) {}
@@ -52,7 +54,7 @@ export class BoardService {
 
   async savePinToBoard(
     userId: number,
-    pinDto: AddPinDto,
+    pinTagDto: AddPinWithTagDto,
     boardId: number,
     image: Express.Multer.File,
   ) {
@@ -70,8 +72,35 @@ export class BoardService {
         'User does not have authority to modify this board',
       );
     }
-    if (!pinDto.id) {
-      if (!image && !pinDto.url) {
+    const tags = [];
+    if (pinTagDto.tagIds !== undefined && pinTagDto.tagIds.length > 0) {
+      for (const tagId of pinTagDto.tagIds) {
+        try {
+          const tagIdNum = Number(tagId);
+          const tag = await this.tagRepository.findOneBy({ id: tagIdNum });
+          tags.push(tag);
+        } catch (err) {
+          continue;
+        }
+      }
+    }
+    if (pinTagDto.tagNames !== undefined && pinTagDto.tagNames.length > 0) {
+      if (Array.isArray(pinTagDto.tagNames)) {
+        for (const tagName of pinTagDto.tagNames) {
+          const tag = this.tagRepository.create();
+          tag.name = tagName;
+          await this.tagRepository.save(tag);
+          tags.push(tag);
+        }
+      } else {
+        const tag = this.tagRepository.create();
+        tag.name = pinTagDto.tagNames;
+        await this.tagRepository.save(tag);
+        tags.push(tag);
+      }
+    }
+    if (!pinTagDto.id) {
+      if (!image && !pinTagDto.url) {
         throw new BadRequestException(
           'Url or file is required to create completely new pin',
         );
@@ -86,18 +115,18 @@ export class BoardService {
         ext?: string;
         mime?: string;
       };
-      if (pinDto.url) {
-        url = pinDto.url;
-        thumbtry = await this.thumbnailService.createFromUrl(pinDto.url);
+      if (pinTagDto.url) {
+        url = pinTagDto.url;
+        thumbtry = await this.thumbnailService.createFromUrl(pinTagDto.url);
       } else {
+        pinTagDto;
         url = await this.firebaseService.uploadFile(image, pin.fileuuid);
         thumbtry = await this.thumbnailService.createFromBuffer(image.buffer);
       }
-      if (!pinDto.name) {
+      if (!pinTagDto.name) {
         throw new BadRequestException('Pin must have a name.');
       }
       if (thumbtry.err) {
-        console.log(thumbtry.err);
         thumbnailUrl = url;
       } else {
         thumbnailUrl = await this.firebaseService.uploadFromBuffer(
@@ -107,15 +136,28 @@ export class BoardService {
           { contentType: thumbtry.mime },
         );
       }
-      pin.name = pinDto.name;
+      pin.name = pinTagDto.name;
       pin.url = url;
       pin.thumbnail = thumbnailUrl;
+      pin.tags = tags;
+      const userCur = await this.userRepsitory.findOneBy({ id: userId });
+      if (!userCur) {
+        throw new BadRequestException('Wrong user.');
+      } else {
+        pin.user = userCur;
+      }
       await this.pinRepository.save(pin);
     } else {
-      pin = await this.pinRepository.findOneBy({ id: pinDto.id });
+      pin = await this.pinRepository.findOne({
+        relations: { tags: true, user: true },
+        where: { id: pinTagDto.id },
+        select: { tags: { id: true } },
+      });
       if (!pin) {
         throw new BadRequestException('Pin does not exist.');
       }
+      pin.tags = [...pin.tags, ...tags];
+      await this.pinRepository.save(pin);
     }
     board.pins = [...board.pins, pin];
     if (!board.thumbnail) {

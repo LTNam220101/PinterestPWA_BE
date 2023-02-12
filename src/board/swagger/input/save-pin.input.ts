@@ -30,4 +30,25 @@ export class SavePinInput {
       'Only provided should this is a completely new pin. If "id" is presented, leave this as null',
   })
   name?: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Only provided if you want to add exisiting tags when saving pin',
+    type: 'array',
+    items: {
+      type: 'number',
+    },
+  })
+  tagIds: number[];
+
+  @ApiProperty({
+    required: false,
+    description: 'Only provided if you want to add new tags when saving pin',
+    type: 'array',
+    items: {
+      type: 'string',
+    },
+  })
+  tagNames: string[];
 }
