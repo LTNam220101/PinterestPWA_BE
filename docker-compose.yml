@@ -1,0 +1,25 @@
+
+version: "1.0"
+services:
+  postgres:
+    image: postgres
+    container_name: postgres
+    environment:
+      POSTGRES_DB: pinterest-clone
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123123
+    ports: 
+      - "5432:5432"
+    volumes:
+      - docker-nest-postgres:/var/lib/postgresql/data
+  test:
+    ports:
+      - "3000:3000"
+    build: .
+    depends_on:
+    - postgres
+    environment:
+    - DB_HOST=postgres
+    - DB_PORT=5432
+volumes:
+  docker-nest-postgres:
